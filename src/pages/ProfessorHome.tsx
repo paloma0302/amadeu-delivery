@@ -1,50 +1,73 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useLocation } from 'react-router-dom'
 import Header from '../components/Header'
 import { IconMinus, IconPlus } from '../components/icons'
-import { listarPedidos, salvarPedidos, type PedidoArmazenado } from '../lib/pedidosStore'
+import { getPedidos, atualizarStatusPedido } from '../api/pedidos'
+import { getProdutosEstoque, atualizarEstoque } from '../api/estoque'
 
-type Pedido = PedidoArmazenado
+interface Pedido {
+  id: number
+  status: string
+  total: number
+  criado_em: string
+  aluno: string
+  itens: string
+}
 
 interface Estoque {
   id: number
   nome: string
-  quantidade: number
+  estoque: number
+  categoria_nome: string
 }
+
+const ABAS = ['Pedidos', 'Estoque']
 
 export default function ProfessorHome() {
   const location = useLocation()
   const usuario = (location.state as { usuario?: string } | null)?.usuario
 
-  const [pedidos, setPedidos] = useState<Pedido[]>(() => listarPedidos())
+  const [abaSelecionada, setAbaSelecionada] = useState('Pedidos')
+  const [pedidos, setPedidos] = useState<Pedido[]>([])
+  const [estoque, setEstoque] = useState<Estoque[]>([])
+  const [carregando, setCarregando] = useState(true)
 
-  const [estoque, setEstoque] = useState<Estoque[]>([
-    { id: 1, nome: 'Pão de batata com calabresa', quantidade: 10 },
-    { id: 2, nome: 'Empadinha de frango', quantidade: 10 },
-    { id: 3, nome: 'Bauruzinho', quantidade: 10 },
-    { id: 4, nome: 'Esfiha de carne', quantidade: 15 },
-    { id: 5, nome: 'Enroladinho de salsicha', quantidade: 20 },
-  ])
+  useEffect(() => {
+    Promise.all([getPedidos(), getProdutosEstoque()])
+      .then(([pedidosData, estoqueData]) => {
+        setPedidos(pedidosData)
+        setEstoque(estoqueData)
+      })
+      .catch(() => alert('Erro ao carregar dados'))
+      .finally(() => setCarregando(false))
+  }, [])
 
-  const ajustarEstoque = (id: number, delta: number) => {
-    setEstoque(estoque.map(e =>
-      e.id === id ? { ...e, quantidade: Math.max(0, e.quantidade + delta) } : e
-    ))
+  const ajustarEstoque = async (id: number, delta: number) => {
+    const item = estoque.find(e => e.id === id)
+    if (!item) return
+    const novaQtd = Math.max(0, item.estoque + delta)
+    try {
+      await atualizarEstoque(id, novaQtd)
+      setEstoque(estoque.map(e => e.id === id ? { ...e, estoque: novaQtd } : e))
+    } catch {
+      alert('Erro ao atualizar estoque')
+    }
   }
 
-  const atualizarStatusPedido = (id: number) => {
-    setPedidos(prev => {
-      const atualizados = prev.map(p =>
-        p.id === id ? { ...p, status: 'entregue' as Pedido['status'] } : p
-      )
-      salvarPedidos(atualizados)
-      return atualizados
-    })
+  const marcarEntregue = async (id: number) => {
+    try {
+      await atualizarStatusPedido(id, 'entregue')
+      setPedidos(prev => prev.filter(p => p.id !== id))
+    } catch {
+      alert('Erro ao atualizar pedido')
+    }
   }
 
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'pendente': return 'bg-yellow-100 text-yellow-800'
+      case 'em_preparo': return 'bg-blue-100 text-blue-800'
+      case 'pronto_para_retirada': return 'bg-green-100 text-green-800'
       case 'entregue': return 'bg-gray-100 text-gray-800'
       default: return 'bg-gray-100 text-gray-800'
     }
@@ -53,18 +76,25 @@ export default function ProfessorHome() {
   const getStatusLabel = (status: string) => {
     switch (status) {
       case 'pendente': return 'Pendente'
+      case 'em_preparo': return 'Em preparo'
+      case 'pronto_para_retirada': return 'Pronto para retirada'
       case 'entregue': return 'Entregue'
       default: return status
     }
   }
 
-  const pedidosPendentes = pedidos.filter(p => p.status !== 'entregue')
+  // Agrupa estoque por categoria
+  const estoqueAgrupado = estoque.reduce((acc, item) => {
+    const cat = item.categoria_nome || 'Outros'
+    if (!acc[cat]) acc[cat] = []
+    acc[cat].push(item)
+    return acc
+  }, {} as Record<string, Estoque[]>)
 
   return (
     <div className="min-h-screen bg-slate-50">
       <Header role="Professor" usuario={usuario} />
 
-      {/* Banner */}
       <div className="bg-red-600 text-white px-6 py-12">
         <div className="max-w-6xl mx-auto">
           <h1 className="text-3xl md:text-4xl font-bold">Painel do Professor</h1>
@@ -72,42 +102,65 @@ export default function ProfessorHome() {
         </div>
       </div>
 
-      {/* Main Content */}
-      <div className="max-w-6xl mx-auto px-6 py-10">
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-          {/* Pedidos Recebidos */}
-          <div className="lg:col-span-2">
-            <div className="flex items-center justify-between border-b-2 border-red-500 pb-3 mb-5">
-              <h2 className="text-xl font-bold text-gray-800">Pedidos Recebidos</h2>
-            </div>
+      {/* Abas */}
+      <div className="bg-white border-b border-gray-200 sticky top-0 z-40">
+        <div className="max-w-6xl mx-auto px-6">
+          <div className="flex gap-1">
+            {ABAS.map(aba => (
+              <button
+                key={aba}
+                onClick={() => setAbaSelecionada(aba)}
+                className={`px-8 py-4 text-sm font-semibold border-b-2 transition-colors ${
+                  abaSelecionada === aba
+                    ? 'border-red-600 text-red-600'
+                    : 'border-transparent text-gray-500 hover:text-gray-800'
+                }`}
+              >
+                {aba}
+                {aba === 'Pedidos' && pedidos.length > 0 && (
+                  <span className="ml-2 bg-red-600 text-white text-xs rounded-full px-2 py-0.5">
+                    {pedidos.length}
+                  </span>
+                )}
+              </button>
+            ))}
+          </div>
+        </div>
+      </div>
 
-            {pedidosPendentes.length === 0 ? (
+      <div className="max-w-6xl mx-auto px-6 py-10">
+        {carregando ? (
+          <p className="text-center text-gray-500">Carregando...</p>
+        ) : abaSelecionada === 'Pedidos' ? (
+          /* ABA PEDIDOS */
+          <div>
+            {pedidos.length === 0 ? (
               <div className="bg-white rounded-2xl shadow-sm border border-gray-100 py-14 text-center text-gray-400">
                 Nenhum pedido pendente
               </div>
             ) : (
               <div className="space-y-4">
-                {pedidosPendentes.map(pedido => (
+                {pedidos.map(pedido => (
                   <div key={pedido.id} className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
                     <div className="flex flex-wrap justify-between items-start gap-2 mb-3">
                       <div>
-                        <p className="text-sm text-gray-500">Pedido #{pedido.numero}</p>
-                        <h3 className="text-lg font-bold text-gray-800 break-all">{pedido.aluno}</h3>
+                        <p className="text-sm text-gray-500">Pedido #{pedido.id}</p>
+                        <h3 className="text-lg font-bold text-gray-800">{pedido.aluno}</h3>
                       </div>
                       <div className="text-right">
-                        <p className="text-sm text-gray-500">{pedido.horario}</p>
-                        <p className="text-xl font-bold text-red-600">R$ {pedido.total.toFixed(2)}</p>
+                        <p className="text-sm text-gray-500">
+                          {new Date(pedido.criado_em).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
+                        </p>
+                        <p className="text-xl font-bold text-red-600">R$ {Number(pedido.total).toFixed(2)}</p>
                       </div>
                     </div>
-
                     <p className="text-gray-600 mb-4 text-sm">{pedido.itens}</p>
-
                     <div className="flex flex-wrap justify-between items-center gap-3">
                       <span className={`px-3 py-1.5 rounded-lg text-sm font-semibold ${getStatusColor(pedido.status)}`}>
                         {getStatusLabel(pedido.status)}
                       </span>
                       <button
-                        onClick={() => atualizarStatusPedido(pedido.id)}
+                        onClick={() => marcarEntregue(pedido.id)}
                         className="bg-red-600 text-white px-5 py-2 rounded-full hover:bg-red-700 transition-colors text-sm font-semibold"
                       >
                         Marcar como entregue
@@ -118,40 +171,46 @@ export default function ProfessorHome() {
               </div>
             )}
           </div>
-
-          {/* Controle de Estoque */}
+        ) : (
+          /* ABA ESTOQUE */
           <div>
-            <div className="flex items-center justify-between border-b-2 border-red-500 pb-3 mb-5">
-              <h2 className="text-xl font-bold text-gray-800">Controle de Estoque</h2>
-            </div>
-
-            <div className="space-y-4">
-              {estoque.map(item => (
-                <div key={item.id} className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5">
-                  <p className="font-semibold text-gray-800 mb-3">{item.nome}</p>
-                  <div className="bg-gray-50 rounded-xl py-4 text-center mb-3">
-                    <p className="text-3xl font-bold text-red-600">{item.quantidade}</p>
-                    <p className="text-xs text-gray-500 mt-1">unidades</p>
-                  </div>
-                  <div className="grid grid-cols-2 gap-3">
-                    <button
-                      onClick={() => ajustarEstoque(item.id, -1)}
-                      className="flex items-center justify-center gap-1 bg-red-50 text-red-600 font-bold rounded-lg py-2 hover:bg-red-100 transition-colors"
-                    >
-                      <IconMinus />
-                    </button>
-                    <button
-                      onClick={() => ajustarEstoque(item.id, 1)}
-                      className="flex items-center justify-center gap-1 bg-green-50 text-green-600 font-bold rounded-lg py-2 hover:bg-green-100 transition-colors"
-                    >
-                      <IconPlus />
-                    </button>
-                  </div>
+            {Object.entries(estoqueAgrupado).map(([categoria, itens]) => (
+              <div key={categoria} className="mb-10">
+                <div className="border-b-2 border-red-500 pb-3 mb-5">
+                  <h2 className="text-xl font-bold text-gray-800">{categoria}</h2>
                 </div>
-              ))}
-            </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+                  {itens.map(item => (
+                    <div key={item.id} className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5">
+                      <p className="font-semibold text-gray-800 mb-3 text-sm">{item.nome}</p>
+                      <div className="bg-gray-50 rounded-xl py-4 text-center mb-3">
+                        <p className={`text-3xl font-bold ${item.estoque === 0 ? 'text-gray-400' : 'text-red-600'}`}>
+                          {item.estoque}
+                        </p>
+                        <p className="text-xs text-gray-500 mt-1">unidades</p>
+                      </div>
+                      <div className="grid grid-cols-2 gap-3">
+                        <button
+                          onClick={() => ajustarEstoque(item.id, -1)}
+                          disabled={item.estoque === 0}
+                          className="flex items-center justify-center gap-1 bg-red-50 text-red-600 font-bold rounded-lg py-2 hover:bg-red-100 transition-colors disabled:opacity-40"
+                        >
+                          <IconMinus />
+                        </button>
+                        <button
+                          onClick={() => ajustarEstoque(item.id, 1)}
+                          className="flex items-center justify-center gap-1 bg-green-50 text-green-600 font-bold rounded-lg py-2 hover:bg-green-100 transition-colors"
+                        >
+                          <IconPlus />
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ))}
           </div>
-        </div>
+        )}
       </div>
     </div>
   )

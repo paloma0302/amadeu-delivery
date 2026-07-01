@@ -1,17 +1,17 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { login } from '../api/auth'
 
 export default function Login() {
   const [usuario, setUsuario] = useState('')
   const [senha, setSenha] = useState('')
   const [erro, setErro] = useState('')
+  const [carregando, setCarregando] = useState(false)
   const navigate = useNavigate()
 
-  const validarAluno = (login: string) => /^\d+sp$/.test(login)
-  const validarProfessor = (login: string) => /^rg\d+sp$/.test(login)
   const camposPreenchidos = usuario.trim().length > 0 && senha.trim().length > 0
 
-  const handleLogin = (e: React.FormEvent) => {
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault()
     setErro('')
 
@@ -20,12 +20,19 @@ export default function Login() {
       return
     }
 
-    if (validarAluno(usuario)) {
-      navigate('/aluno', { state: { usuario } })
-    } else if (validarProfessor(usuario)) {
-      navigate('/professor', { state: { usuario } })
-    } else {
-      setErro('Formato de login inválido')
+    setCarregando(true)
+    try {
+      const dados = await login(usuario, senha)
+
+      if (dados.tipo === 'aluno') {
+        navigate('/aluno', { state: { usuario: dados.ra, aluno_id: dados.id } })
+      } else {
+        navigate('/professor', { state: { usuario: dados.ra } })
+      }
+    } catch (error: any) {
+      setErro(error.message || 'Erro ao fazer login')
+    } finally {
+      setCarregando(false)
     }
   }
 
@@ -37,7 +44,6 @@ export default function Login() {
 
       <div className="w-full max-w-lg bg-white rounded-3xl shadow-xl shadow-slate-200/60 p-14">
         <form onSubmit={handleLogin} className="space-y-12">
-          {/* Usuario */}
           <div>
             <label className="block text-lg font-bold text-slate-800 mb-4">
               Usuário
@@ -57,7 +63,6 @@ export default function Login() {
             </p>
           </div>
 
-          {/* Senha */}
           <div>
             <label className="block text-lg font-bold text-slate-800 mb-4">
               Senha
@@ -71,30 +76,29 @@ export default function Login() {
             />
           </div>
 
-          {/* Erro */}
           {erro && (
             <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg text-sm">
               {erro}
             </div>
           )}
 
-          {/* Button */}
           <button
             type="submit"
+            disabled={!camposPreenchidos || carregando}
             className={`w-full py-4 rounded-full font-bold text-lg transition-colors shadow-sm text-white mt-2 ${
-              camposPreenchidos
+              camposPreenchidos && !carregando
                 ? 'bg-red-600 hover:bg-red-700'
-                : 'bg-rose-400 hover:bg-rose-500'
+                : 'bg-rose-400'
             }`}
           >
-            Fazer cadastro
+            {carregando ? 'Entrando...' : 'Entrar'}
           </button>
         </form>
 
         <hr className="border-gray-100 my-10" />
 
         <p className="text-sm text-gray-500 text-center leading-relaxed">
-          Use qualquer senha para demonstração. O sistema valida apenas o formato do login.
+          Primeiro acesso? Entre com seu RA e crie uma senha.
         </p>
       </div>
 
