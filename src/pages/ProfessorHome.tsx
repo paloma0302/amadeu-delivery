@@ -31,12 +31,17 @@ export default function ProfessorHome() {
   const [pedidos, setPedidos] = useState<Pedido[]>([])
   const [estoque, setEstoque] = useState<Estoque[]>([])
   const [carregando, setCarregando] = useState(true)
+  const [valoresInput, setValoresInput] = useState<Record<number, string>>({})
 
   useEffect(() => {
     Promise.all([getPedidos(), getProdutosEstoque()])
       .then(([pedidosData, estoqueData]) => {
         setPedidos(pedidosData)
         setEstoque(estoqueData)
+        setValoresInput(estoqueData.reduce((acc: Record<number, string>, item: Estoque) => ({
+          ...acc,
+          [item.id]: String(item.estoque)
+        }), {}))
       })
       .catch(() => alert('Erro ao carregar dados'))
       .finally(() => setCarregando(false))
@@ -49,8 +54,29 @@ export default function ProfessorHome() {
     try {
       await atualizarEstoque(id, novaQtd)
       setEstoque(estoque.map(e => e.id === id ? { ...e, estoque: novaQtd } : e))
+      setValoresInput(v => ({ ...v, [id]: String(novaQtd) }))
     } catch {
       alert('Erro ao atualizar estoque')
+    }
+  }
+
+  const handleInputChange = (id: number, valor: string) => {
+    if (/^\d*$/.test(valor)) {
+      setValoresInput(v => ({ ...v, [id]: valor }))
+    }
+  }
+
+  const handleInputBlur = async (id: number) => {
+    const novaQtd = Math.max(0, parseInt(valoresInput[id] || '0'))
+    const item = estoque.find(e => e.id === id)
+    if (!item || novaQtd === item.estoque) return
+    try {
+      await atualizarEstoque(id, novaQtd)
+      setEstoque(estoque.map(e => e.id === id ? { ...e, estoque: novaQtd } : e))
+      setValoresInput(v => ({ ...v, [id]: String(novaQtd) }))
+    } catch {
+      alert('Erro ao atualizar estoque')
+      setValoresInput(v => ({ ...v, [id]: String(item.estoque) }))
     }
   }
 
@@ -83,7 +109,6 @@ export default function ProfessorHome() {
     }
   }
 
-  // Agrupa estoque por categoria
   const estoqueAgrupado = estoque.reduce((acc, item) => {
     const cat = item.categoria_nome || 'Outros'
     if (!acc[cat]) acc[cat] = []
@@ -132,7 +157,6 @@ export default function ProfessorHome() {
         {carregando ? (
           <p className="text-center text-gray-500">Carregando...</p>
         ) : abaSelecionada === 'Pedidos' ? (
-          /* ABA PEDIDOS */
           <div>
             {pedidos.length === 0 ? (
               <div className="bg-white rounded-2xl shadow-sm border border-gray-100 py-14 text-center text-gray-400">
@@ -172,8 +196,8 @@ export default function ProfessorHome() {
             )}
           </div>
         ) : (
-          /* ABA ESTOQUE */
           <div>
+            <p className="text-sm text-gray-500 mb-6">Clique no número para digitar a quantidade diretamente, ou use os botões + e - para ajustes rápidos.</p>
             {Object.entries(estoqueAgrupado).map(([categoria, itens]) => (
               <div key={categoria} className="mb-10">
                 <div className="border-b-2 border-red-500 pb-3 mb-5">
@@ -183,10 +207,17 @@ export default function ProfessorHome() {
                   {itens.map(item => (
                     <div key={item.id} className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5">
                       <p className="font-semibold text-gray-800 mb-3 text-sm">{item.nome}</p>
-                      <div className="bg-gray-50 rounded-xl py-4 text-center mb-3">
-                        <p className={`text-3xl font-bold ${item.estoque === 0 ? 'text-gray-400' : 'text-red-600'}`}>
-                          {item.estoque}
-                        </p>
+                      <div className="bg-gray-50 rounded-xl py-3 text-center mb-3">
+                        <input
+                          type="number"
+                          min="0"
+                          value={valoresInput[item.id] ?? item.estoque}
+                          onChange={e => handleInputChange(item.id, e.target.value)}
+                          onBlur={() => handleInputBlur(item.id)}
+                          className={`w-20 text-center text-3xl font-bold bg-transparent outline-none border-b-2 border-transparent focus:border-red-400 transition-colors ${
+                            item.estoque === 0 ? 'text-gray-400' : 'text-red-600'
+                          }`}
+                        />
                         <p className="text-xs text-gray-500 mt-1">unidades</p>
                       </div>
                       <div className="grid grid-cols-2 gap-3">
