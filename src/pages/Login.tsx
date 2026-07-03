@@ -97,9 +97,17 @@ export default function Login() {
 
         <hr className="border-gray-100 my-10" />
 
-        <p className="text-sm text-gray-500 text-center leading-relaxed">
-          Primeiro acesso? Entre com seu RA e crie uma senha.
-        </p>
+        <div className="text-center space-y-3">
+          <p className="text-sm text-gray-500">
+            Primeiro acesso? Entre com seu RA e crie uma senha.
+          </p>
+          <button
+            onClick={() => navigate('/recuperar-senha')}
+            className="text-sm text-red-600 hover:text-red-700 font-semibold"
+          >
+            Esqueci minha senha
+          </button>
+        </div>
       </div>
 
       <p className="text-sm text-gray-400 mt-10 text-center">
