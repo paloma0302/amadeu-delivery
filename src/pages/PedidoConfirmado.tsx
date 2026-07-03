@@ -5,7 +5,7 @@ import { IconCheck } from '../components/icons'
 export default function PedidoConfirmado() {
   const navigate = useNavigate()
   const location = useLocation()
-  const { numeroPedido, total, usuario } = location.state || { numeroPedido: 0, total: 0, usuario: '' }
+  const { numeroPedido, total, usuario, aluno_id } = location.state || { numeroPedido: 0, total: 0, usuario: '', aluno_id: null }
 
   return (
     <div className="min-h-screen bg-slate-50">
@@ -35,25 +35,25 @@ export default function PedidoConfirmado() {
 
           {/* Status */}
           <div className="bg-blue-50 border border-blue-100 p-4 rounded-xl mb-8 text-left">
-            <p className="text-blue-800 font-semibold text-sm">Status: Aguardando Retirada</p>
+            <p className="text-blue-800 font-semibold text-sm">Status: Aguardando Preparo</p>
             <p className="text-blue-700 text-sm mt-1">
-              Seu pedido está sendo preparado. Você será notificado quando estiver pronto.
+              Seu pedido está sendo preparado. Acompanhe o status em tempo real.
             </p>
           </div>
 
           {/* Botões */}
           <div className="flex flex-col sm:flex-row gap-4 sm:gap-6">
             <button
-              onClick={() => navigate('/aluno', { state: { usuario } })}
+              onClick={() => navigate('/aluno', { state: { usuario, aluno_id } })}
               className="w-full sm:flex-1 bg-gray-100 text-gray-700 py-3.5 rounded-full hover:bg-gray-200 transition-colors font-semibold"
             >
               Voltar ao Menu
             </button>
             <button
-              onClick={() => navigate('/')}
+              onClick={() => navigate('/acompanhar-pedido', { state: { numeroPedido, usuario, aluno_id } })}
               className="w-full sm:flex-1 bg-red-600 text-white py-3.5 rounded-full hover:bg-red-700 transition-colors font-semibold"
             >
-              Ir para tela inicial
+              Acompanhar Pedido
             </button>
           </div>
         </div>

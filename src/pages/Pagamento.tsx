@@ -45,6 +45,7 @@ export default function Pagamento() {
           numeroPedido: resultado.pedidoId,
           total,
           usuario,
+          aluno_id,
         },
       })
     } catch (error: any) {

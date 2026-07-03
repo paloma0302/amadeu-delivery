@@ -4,6 +4,7 @@ import AlunoHome from './pages/AlunoHome'
 import Pagamento from './pages/Pagamento'
 import PedidoConfirmado from './pages/PedidoConfirmado'
 import ProfessorHome from './pages/ProfessorHome'
+import AcompanharPedido from './pages/AcompanharPedido'
 
 function App() {
   return (
@@ -14,6 +15,7 @@ function App() {
         <Route path="/pagamento" element={<Pagamento />} />
         <Route path="/pedido-confirmado" element={<PedidoConfirmado />} />
         <Route path="/professor" element={<ProfessorHome />} />
+        <Route path="/acompanhar-pedido" element={<AcompanharPedido />} />
       </Routes>
     </Router>
   )

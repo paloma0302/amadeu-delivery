@@ -36,6 +36,18 @@ router.post('/', async (req: Request, res: Response) => {
     return res.status(400).json({ erro: 'Dados inválidos' });
   }
 
+  // Verifica se está no horário permitido para pedidos
+  const agora = new Date();
+  const minutos = agora.getHours() * 60 + agora.getMinutes();
+  const bloqueios = [
+    { inicio: 9 * 60 + 40, fim: 10 * 60 + 10 },
+    { inicio: 11 * 60 + 50, fim: 24 * 60 },
+  ];
+  const bloqueado = bloqueios.some(b => minutos >= b.inicio && minutos < b.fim);
+  if (bloqueado) {
+    return res.status(403).json({ erro: 'Fora do horário permitido para pedidos' });
+  }
+
   const connection = await (pool as any).getConnection();
 
   try {
@@ -72,7 +84,6 @@ router.post('/', async (req: Request, res: Response) => {
       );
     }
 
-    // Atualiza o total do pedido
     const [totalResult]: any = await connection.query(
       'SELECT SUM(quantidade * preco_unitario) as total FROM itens_pedido WHERE pedido_id = ?',
       [pedidoId]

@@ -3,6 +3,7 @@ import { useNavigate, useLocation } from 'react-router-dom'
 import Header from '../components/Header'
 import { IconImageOff, IconMinus, IconPlus } from '../components/icons'
 import { getProdutos } from '../api/produtos'
+import { getPeriodoAtual, getMensagemPeriodo } from '../lib/horarios'
 
 interface Lanche {
   id: number
@@ -28,6 +29,8 @@ export default function AlunoHome() {
   const [carrinho, setCarrinho] = useState<{ id: number; quantidade: number }[]>([])
   const [quantidades, setQuantidades] = useState<Record<number, number>>({})
   const [categoriaSelecionada, setCategoriaSelecionada] = useState<number | null>(null)
+  const [periodo, setPeriodo] = useState(getPeriodoAtual())
+  const [mensagem, setMensagem] = useState(getMensagemPeriodo())
   const navigate = useNavigate()
   const location = useLocation()
   const usuario = (location.state as { usuario?: string; aluno_id?: number } | null)?.usuario
@@ -41,7 +44,17 @@ export default function AlunoHome() {
       })
       .catch(() => alert('Erro ao carregar produtos'))
       .finally(() => setCarregando(false))
+
+    // Atualiza o período a cada minuto
+    const intervalo = setInterval(() => {
+      setPeriodo(getPeriodoAtual())
+      setMensagem(getMensagemPeriodo())
+    }, 60000)
+
+    return () => clearInterval(intervalo)
   }, [])
+
+  const podeFazerPedido = periodo === 'pedidos_abertos'
 
   const lanchesFiltrados = categoriaSelecionada === null
     ? lanches
@@ -57,6 +70,7 @@ export default function AlunoHome() {
   }
 
   const adicionarAoCarrinho = (id: number) => {
+    if (!podeFazerPedido) return
     const qtd = quantidades[id] || 1
     const lanche = lanches.find(l => l.id === id)
     if (!lanche || lanche.estoque === 0) return
@@ -86,16 +100,43 @@ export default function AlunoHome() {
     navigate('/pagamento', { state: { carrinho, lanches, usuario, aluno_id } })
   }
 
+  const getBannerPeriodo = () => {
+    switch (periodo) {
+      case 'retirada_liberada':
+        return 'bg-green-600'
+      case 'bloqueado':
+        return 'bg-gray-600'
+      default:
+        return 'bg-red-600'
+    }
+  }
+
   return (
     <div className="min-h-screen bg-slate-50">
       <Header role="Aluno" usuario={usuario} />
 
-      <div className="bg-red-600 text-white px-6 py-12">
+      <div className={`${getBannerPeriodo()} text-white px-6 py-12`}>
         <div className="max-w-6xl mx-auto">
           <h1 className="text-3xl md:text-4xl font-bold">AMADEU DELIVERY</h1>
-          <p className="text-red-100 mt-2">Lanches disponíveis do dia</p>
+          <p className="text-white/80 mt-2">{mensagem}</p>
         </div>
       </div>
+
+      {/* Aviso de período */}
+      {periodo === 'retirada_liberada' && (
+        <div className="bg-green-50 border-b border-green-200 px-6 py-3">
+          <p className="text-green-800 text-sm font-semibold text-center">
+            🎉 Intervalo! Vá até a cantina retirar seu pedido.
+          </p>
+        </div>
+      )}
+      {periodo === 'bloqueado' && (
+        <div className="bg-gray-50 border-b border-gray-200 px-6 py-3">
+          <p className="text-gray-600 text-sm font-semibold text-center">
+            ⏰ Pedidos encerrados por hoje. Volte amanhã!
+          </p>
+        </div>
+      )}
 
       {/* Abas de categorias */}
       <div className="bg-white border-b border-gray-200 sticky top-0 z-40">
@@ -147,7 +188,7 @@ export default function AlunoHome() {
                   <div className="flex items-center gap-3 mb-4">
                     <button
                       onClick={() => ajustarQuantidade(lanche.id, -1)}
-                      disabled={lanche.estoque === 0}
+                      disabled={lanche.estoque === 0 || !podeFazerPedido}
                       className="w-8 h-8 rounded-full bg-gray-100 hover:bg-gray-200 text-gray-700 flex items-center justify-center disabled:opacity-40"
                     >
                       <IconMinus />
@@ -157,7 +198,7 @@ export default function AlunoHome() {
                     </span>
                     <button
                       onClick={() => ajustarQuantidade(lanche.id, 1)}
-                      disabled={lanche.estoque === 0 || quantidades[lanche.id] >= lanche.estoque}
+                      disabled={lanche.estoque === 0 || quantidades[lanche.id] >= lanche.estoque || !podeFazerPedido}
                       className="w-8 h-8 rounded-full bg-gray-100 hover:bg-gray-200 text-gray-700 flex items-center justify-center disabled:opacity-40"
                     >
                       <IconPlus />
@@ -166,10 +207,14 @@ export default function AlunoHome() {
 
                   <button
                     onClick={() => adicionarAoCarrinho(lanche.id)}
-                    disabled={lanche.estoque === 0}
+                    disabled={lanche.estoque === 0 || !podeFazerPedido}
                     className="mt-auto w-full bg-red-600 text-white py-2.5 rounded-full font-semibold hover:bg-red-700 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
                   >
-                    {lanche.estoque === 0 ? 'Sem estoque' : 'Adicionar pedido'}
+                    {lanche.estoque === 0
+                      ? 'Sem estoque'
+                      : !podeFazerPedido
+                      ? periodo === 'retirada_liberada' ? 'Retire seu pedido' : 'Pedidos encerrados'
+                      : 'Adicionar pedido'}
                   </button>
                 </div>
               </div>
@@ -178,7 +223,7 @@ export default function AlunoHome() {
         )}
       </div>
 
-      {carrinho.length > 0 && (
+      {carrinho.length > 0 && podeFazerPedido && (
         <div className="fixed bottom-6 right-6 bg-white rounded-2xl shadow-xl border border-gray-100 p-6 w-80 z-50">
           <h3 className="text-lg font-bold mb-4 text-gray-800">Carrinho ({totalItens})</h3>
           <div className="space-y-2 mb-4 max-h-48 overflow-y-auto">
