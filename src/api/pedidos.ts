@@ -4,18 +4,34 @@ export async function criarPedido(aluno_id: number, itens: { produto_id: number;
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ aluno_id, itens }),
   });
-
   if (!res.ok) {
     const erro = await res.json();
     throw new Error(erro.erro || 'Erro ao criar pedido');
   }
-
   return res.json();
 }
 
 export async function getPedidos() {
   const res = await fetch('/api/pedidos');
   if (!res.ok) throw new Error('Erro ao carregar pedidos');
+  return res.json();
+}
+
+export async function getPedidosAtivosAluno(aluno_id: number) {
+  const res = await fetch(`/api/pedidos/aluno/${aluno_id}`);
+  if (!res.ok) throw new Error('Erro ao carregar pedidos');
+  return res.json();
+}
+
+export async function getHistoricoAluno(aluno_id: number) {
+  const res = await fetch(`/api/pedidos/historico/${aluno_id}`);
+  if (!res.ok) throw new Error('Erro ao carregar histórico');
+  return res.json();
+}
+
+export async function getHistoricoGeral() {
+  const res = await fetch('/api/pedidos/historico/geral');
+  if (!res.ok) throw new Error('Erro ao carregar histórico');
   return res.json();
 }
 

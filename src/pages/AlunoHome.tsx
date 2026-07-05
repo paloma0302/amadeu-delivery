@@ -45,7 +45,6 @@ export default function AlunoHome() {
       .catch(() => alert('Erro ao carregar produtos'))
       .finally(() => setCarregando(false))
 
-    // Atualiza o período a cada minuto
     const intervalo = setInterval(() => {
       setPeriodo(getPeriodoAtual())
       setMensagem(getMensagemPeriodo())
@@ -115,6 +114,18 @@ export default function AlunoHome() {
     <div className="min-h-screen bg-slate-50">
       <Header role="Aluno" usuario={usuario} />
 
+      {/* Botão Meus Pedidos */}
+      <div className="bg-white border-b border-gray-100 px-6 py-2">
+        <div className="max-w-6xl mx-auto flex justify-end">
+          <button
+            onClick={() => navigate('/meus-pedidos', { state: { usuario, aluno_id } })}
+            className="text-sm text-red-600 font-semibold hover:text-red-700"
+          >
+            Meu Pedido →
+          </button>
+        </div>
+      </div>
+
       <div className={`${getBannerPeriodo()} text-white px-6 py-12`}>
         <div className="max-w-6xl mx-auto">
           <h1 className="text-3xl md:text-4xl font-bold">AMADEU DELIVERY</h1>
@@ -122,7 +133,6 @@ export default function AlunoHome() {
         </div>
       </div>
 
-      {/* Aviso de período */}
       {periodo === 'retirada_liberada' && (
         <div className="bg-green-50 border-b border-green-200 px-6 py-3">
           <p className="text-green-800 text-sm font-semibold text-center">
@@ -138,7 +148,6 @@ export default function AlunoHome() {
         </div>
       )}
 
-      {/* Abas de categorias */}
       <div className="bg-white border-b border-gray-200 sticky top-0 z-40">
         <div className="max-w-6xl mx-auto px-6">
           <div className="flex gap-1 overflow-x-auto">

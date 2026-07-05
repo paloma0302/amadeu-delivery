@@ -6,6 +6,7 @@ import PedidoConfirmado from './pages/PedidoConfirmado'
 import ProfessorHome from './pages/ProfessorHome'
 import AcompanharPedido from './pages/AcompanharPedido'
 import RecuperarSenha from './pages/RecuperarSenha'
+import MeusPedidos from './pages/MeusPedidos'
 
 function App() {
   return (
@@ -18,6 +19,7 @@ function App() {
         <Route path="/professor" element={<ProfessorHome />} />
         <Route path="/acompanhar-pedido" element={<AcompanharPedido />} />
         <Route path="/recuperar-senha" element={<RecuperarSenha />} />
+        <Route path="/meus-pedidos" element={<MeusPedidos />} />
       </Routes>
     </Router>
   )

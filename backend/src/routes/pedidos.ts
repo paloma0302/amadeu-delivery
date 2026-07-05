@@ -3,7 +3,7 @@ import pool from '../database';
 
 const router = Router();
 
-// GET /api/pedidos — lista todos os pedidos
+// GET /api/pedidos — lista todos os pedidos ativos (para o professor)
 router.get('/', async (req: Request, res: Response) => {
   try {
     const [pedidos]: any = await pool.query(`
@@ -28,6 +28,91 @@ router.get('/', async (req: Request, res: Response) => {
   }
 });
 
+// GET /api/pedidos/historico/geral — histórico de todos os pedidos (professor)
+router.get('/historico/geral', async (req: Request, res: Response) => {
+  try {
+    const [pedidos]: any = await pool.query(`
+      SELECT 
+        pe.id,
+        pe.status,
+        pe.total,
+        pe.criado_em,
+        u.nome AS aluno,
+        GROUP_CONCAT(CONCAT(p.nome, ' x', ip.quantidade) SEPARATOR ', ') AS itens
+      FROM pedidos pe
+      JOIN usuarios u ON pe.aluno_id = u.id
+      JOIN itens_pedido ip ON pe.id = ip.pedido_id
+      JOIN produtos p ON ip.produto_id = p.id
+      GROUP BY pe.id, pe.status, pe.total, pe.criado_em, u.nome
+      ORDER BY pe.criado_em DESC
+    `);
+
+    const [totalResult]: any = await pool.query(`
+      SELECT COALESCE(SUM(total), 0) AS total_geral
+      FROM pedidos
+      WHERE status = 'entregue'
+    `);
+
+    res.json({ pedidos, total_geral: totalResult[0].total_geral });
+  } catch (error) {
+    res.status(500).json({ erro: 'Erro ao buscar histórico' });
+  }
+});
+
+// GET /api/pedidos/aluno/:aluno_id — pedidos ativos do aluno
+router.get('/aluno/:aluno_id', async (req: Request, res: Response) => {
+  try {
+    const [pedidos]: any = await pool.query(`
+      SELECT 
+        pe.id,
+        pe.status,
+        pe.total,
+        pe.criado_em,
+        GROUP_CONCAT(CONCAT(p.nome, ' x', ip.quantidade) SEPARATOR ', ') AS itens
+      FROM pedidos pe
+      JOIN itens_pedido ip ON pe.id = ip.pedido_id
+      JOIN produtos p ON ip.produto_id = p.id
+      WHERE pe.aluno_id = ? AND pe.status != 'entregue'
+      GROUP BY pe.id, pe.status, pe.total, pe.criado_em
+      ORDER BY pe.criado_em DESC
+    `, [req.params.aluno_id]);
+
+    res.json(pedidos);
+  } catch (error) {
+    res.status(500).json({ erro: 'Erro ao buscar pedidos do aluno' });
+  }
+});
+
+// GET /api/pedidos/historico/:aluno_id — histórico do aluno
+router.get('/historico/:aluno_id', async (req: Request, res: Response) => {
+  try {
+    const [pedidos]: any = await pool.query(`
+      SELECT 
+        pe.id,
+        pe.status,
+        pe.total,
+        pe.criado_em,
+        GROUP_CONCAT(CONCAT(p.nome, ' x', ip.quantidade) SEPARATOR ', ') AS itens
+      FROM pedidos pe
+      JOIN itens_pedido ip ON pe.id = ip.pedido_id
+      JOIN produtos p ON ip.produto_id = p.id
+      WHERE pe.aluno_id = ? AND pe.status = 'entregue'
+      GROUP BY pe.id, pe.status, pe.total, pe.criado_em
+      ORDER BY pe.criado_em DESC
+    `, [req.params.aluno_id]);
+
+    const [totalResult]: any = await pool.query(`
+      SELECT COALESCE(SUM(total), 0) AS total_gasto
+      FROM pedidos
+      WHERE aluno_id = ? AND status = 'entregue'
+    `, [req.params.aluno_id]);
+
+    res.json({ pedidos, total_gasto: totalResult[0].total_gasto });
+  } catch (error) {
+    res.status(500).json({ erro: 'Erro ao buscar histórico' });
+  }
+});
+
 // POST /api/pedidos — cria pedido e desconta estoque
 router.post('/', async (req: Request, res: Response) => {
   const { aluno_id, itens } = req.body;
@@ -36,7 +121,6 @@ router.post('/', async (req: Request, res: Response) => {
     return res.status(400).json({ erro: 'Dados inválidos' });
   }
 
-  // Verifica se está no horário permitido para pedidos (07:00 às 13:00)
   const agora = new Date();
   const minutos = agora.getHours() * 60 + agora.getMinutes();
   const permitido = minutos >= 7 * 60 && minutos < 13 * 60;
