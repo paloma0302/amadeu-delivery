@@ -32,6 +32,7 @@ export default function ProfessorHome() {
   const [estoque, setEstoque] = useState<Estoque[]>([])
   const [carregando, setCarregando] = useState(true)
   const [valoresInput, setValoresInput] = useState<Record<number, string>>({})
+  const [busca, setBusca] = useState('')
 
   useEffect(() => {
     Promise.all([getPedidos(), getProdutosEstoque()])
@@ -46,6 +47,10 @@ export default function ProfessorHome() {
       .catch(() => alert('Erro ao carregar dados'))
       .finally(() => setCarregando(false))
   }, [])
+
+  const pedidosFiltrados = busca.trim() === ''
+    ? pedidos
+    : pedidos.filter(p => String(p.id).includes(busca.trim()))
 
   const ajustarEstoque = async (id: number, delta: number) => {
     const item = estoque.find(e => e.id === id)
@@ -160,13 +165,32 @@ export default function ProfessorHome() {
           <p className="text-center text-gray-500">Carregando...</p>
         ) : abaSelecionada === 'Pedidos' ? (
           <div>
-            {pedidos.length === 0 ? (
+            {/* Campo de busca */}
+            <div className="mb-6">
+              <input
+                type="number"
+                value={busca}
+                onChange={e => setBusca(e.target.value)}
+                placeholder="Buscar por número do pedido..."
+                className="w-full sm:w-80 px-5 py-3 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-red-300 focus:border-transparent outline-none"
+              />
+              {busca && (
+                <button
+                  onClick={() => setBusca('')}
+                  className="ml-3 text-sm text-gray-400 hover:text-gray-600"
+                >
+                  Limpar
+                </button>
+              )}
+            </div>
+
+            {pedidosFiltrados.length === 0 ? (
               <div className="bg-white rounded-2xl shadow-sm border border-gray-100 py-14 text-center text-gray-400">
-                Nenhum pedido pendente
+                {busca ? `Nenhum pedido encontrado com o número #${busca}` : 'Nenhum pedido pendente'}
               </div>
             ) : (
               <div className="space-y-4">
-                {pedidos.map(pedido => (
+                {pedidosFiltrados.map(pedido => (
                   <div key={pedido.id} className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
                     <div className="flex flex-wrap justify-between items-start gap-2 mb-3">
                       <div>
